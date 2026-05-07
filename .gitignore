@@ -1,0 +1,9 @@
+venv/
+__marimo__/
+data/
+data-2026-04-22/
+*.ipynb
+*.docx
+*.rtf
+old/
+.DS_Store
