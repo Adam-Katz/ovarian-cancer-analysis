@@ -52,11 +52,24 @@ async def _(mo, pd):
         import js as _js
         from pyodide.http import pyfetch as _pyfetch
         _href = str(_js.location.href)
-        _base = _href[:_href.rfind('/') + 1]
+        # In a web worker, location.href is the *worker script* URL
+        # (e.g. .../assets/worker-xyz.js), not the page URL.
+        # Strip /assets/... to get the deployment root.
+        if '/assets/' in _href:
+            _base = _href[:_href.index('/assets/')] + '/'
+        else:
+            _base = _href[:_href.rfind('/') + 1]
 
         async def _load(name):
-            _resp = await _pyfetch(f'{_base}{_DATA}/{name}')
-            return pd.read_parquet(_io.BytesIO(await _resp.bytes()))
+            _url = f'{_base}{_DATA}/{name}'
+            _resp = await _pyfetch(_url)
+            _raw = await _resp.bytes()
+            if len(_raw) < 4 or _raw[:4] != b'PAR1':
+                raise ValueError(
+                    f"Not parquet — status={_resp.status} url={_url} "
+                    f"first_bytes={_raw[:40]!r}"
+                )
+            return pd.read_parquet(_io.BytesIO(_raw))
 
         diagnosis_df = await _load('diagnosis.parquet')
         medication_ingredient_df = await _load('medication_ingredient.parquet')
