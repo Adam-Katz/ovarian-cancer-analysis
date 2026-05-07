@@ -10,9 +10,11 @@ async def _():
     if 'pyodide' in sys.modules:
         import micropip
         await micropip.install(
-            ['plotly', 'lifelines', 'statsmodels', 'pyarrow'],
+            ['plotly', 'lifelines', 'statsmodels', 'pyarrow', 'pyodide-http'],
             keep_going=True,
         )
+        import pyodide_http
+        pyodide_http.patch_all()
 
     import pandas as pd
     import numpy as np
@@ -45,25 +47,28 @@ def _(mo):
 async def _(mo, pd):
     import sys as _sys
     import io as _io
+    import urllib.request as _urlreq
 
     _DATA = 'data-filtered'
 
     if 'pyodide' in _sys.modules:
-        from pyodide.http import pyfetch as _pyfetch
+        import js as _js
+        _href = str(_js.window.location.href)
+        _base = _href[:_href.rfind('/') + 1]
 
-        async def _load(name):
-            _r = await _pyfetch(f'{_DATA}/{name}')
-            return pd.read_parquet(_io.BytesIO(await _r.bytes()))
+        def _load(name):
+            with _urlreq.urlopen(f'{_base}{_DATA}/{name}') as _f:
+                return pd.read_parquet(_io.BytesIO(_f.read()))
     else:
-        async def _load(name):
+        def _load(name):
             return pd.read_parquet(f'{_DATA}/{name}')
 
-    diagnosis_df = await _load('diagnosis.parquet')
-    medication_ingredient_df = await _load('medication_ingredient.parquet')
-    patient_df = await _load('patient.parquet')
-    tumor_df = await _load('tumor.parquet')
+    diagnosis_df = _load('diagnosis.parquet')
+    medication_ingredient_df = _load('medication_ingredient.parquet')
+    patient_df = _load('patient.parquet')
+    tumor_df = _load('tumor.parquet')
 
-    _enr_raw = await _load('member_enrollment.parquet')
+    _enr_raw = _load('member_enrollment.parquet')
     _cutoff = pd.Timestamp('2026-01-01')
     _bad = _enr_raw['termination_date'] >= _cutoff
     member_enrollment_df = _enr_raw[~_bad].copy()
