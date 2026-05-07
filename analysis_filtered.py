@@ -42,14 +42,28 @@ def _(mo):
 
 
 @app.cell
-def _(mo, pd):
-    # Load all datasets
-    diagnosis_df = pd.read_parquet('data-filtered/diagnosis.parquet')
-    medication_ingredient_df = pd.read_parquet('data-filtered/medication_ingredient.parquet')
-    patient_df = pd.read_parquet('data-filtered/patient.parquet')
-    tumor_df = pd.read_parquet('data-filtered/tumor.parquet')
+async def _(mo, pd):
+    import sys as _sys
+    import io as _io
 
-    _enr_raw = pd.read_parquet('data-filtered/member_enrollment.parquet')
+    _DATA = 'data-filtered'
+
+    if 'pyodide' in _sys.modules:
+        from pyodide.http import pyfetch as _pyfetch
+
+        async def _load(name):
+            _r = await _pyfetch(f'{_DATA}/{name}')
+            return pd.read_parquet(_io.BytesIO(await _r.bytes()))
+    else:
+        async def _load(name):
+            return pd.read_parquet(f'{_DATA}/{name}')
+
+    diagnosis_df = await _load('diagnosis.parquet')
+    medication_ingredient_df = await _load('medication_ingredient.parquet')
+    patient_df = await _load('patient.parquet')
+    tumor_df = await _load('tumor.parquet')
+
+    _enr_raw = await _load('member_enrollment.parquet')
     _cutoff = pd.Timestamp('2026-01-01')
     _bad = _enr_raw['termination_date'] >= _cutoff
     member_enrollment_df = _enr_raw[~_bad].copy()
