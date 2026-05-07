@@ -53,7 +53,7 @@ async def _(mo, pd):
 
     if 'pyodide' in _sys.modules:
         import js as _js
-        _href = str(_js.window.location.href)
+        _href = str(_js.location.href)
         _base = _href[:_href.rfind('/') + 1]
 
         def _load(name):
